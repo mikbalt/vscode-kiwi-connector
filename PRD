@@ -1,0 +1,68 @@
+# PRD: Kiwi TCMS Connector untuk VS Code
+
+## 1. Latar belakang
+
+Tim QA memakai Kiwi TCMS untuk test plan, test case, dan test run, serta punya test framework automation sendiri. Saat ini eksekusi dan mapping bergantung pada ID test run / test case yang dicari manual di web Kiwi, sehingga sering terjadi context switching antara editor dan browser:
+
+- mencari ID case dan run di web lalu menyalinnya ke command atau kode
+- tidak terlihat test mana di kode yang sudah terhubung ke case mana
+- update status execution harus dilakukan di web
+
+## 2. Tujuan
+
+1. Semua aktivitas harian terhadap Kiwi (lihat run, set status, buat run, cari case) bisa dilakukan dari VS Code.
+2. Mapping test case ke kode automation eksplisit, terlihat, dan tervalidasi.
+3. Eksekusi test framework yang sudah ada cukup dengan satu klik dan ID diisi otomatis, hasilnya langsung masuk ke Kiwi.
+
+Di luar cakupan: mengganti UI Kiwi untuk administrasi (product, version, user, permission), editor step test case, dan reporting/dashboard.
+
+## 3. Pengguna
+
+- **QA automation engineer**: menulis test, menghubungkannya ke case, menjalankan run.
+- **QA manual / tester**: melihat run aktif dan mengisi status case manual dari editor.
+
+## 4. Kebutuhan fungsional
+
+| ID | Kebutuhan | Prioritas |
+|---|---|---|
+| F1 | Login ke Kiwi via JSON-RPC (URL, username, password); password di SecretStorage; dukung self-signed cert; auto re-login saat session habis | Must |
+| F2 | View Test Runs: daftar run aktif (filter product), execution + status, aksi Run/Pass/Fail/Set status/Open in browser | Must |
+| F3 | View Test Plans: daftar plan + case, indikator mapped / automated-belum-mapped / manual | Must |
+| F4 | Active test run per workspace, tampil di status bar beserta progress (selesai/total) | Must |
+| F5 | Index marker ID di workspace (regex dapat dikonfigurasi), update realtime saat mengedit | Must |
+| F6 | CodeLens, hover, dan link pada marker: summary, status di active run, Run/Pass/Fail | Must |
+| F7 | Jalankan 1 case dengan template command (`${caseId}`, `${runId}`, `${file}`, `${testName}`, …) sebagai VS Code Task; set RUNNING, lalu PASSED/FAILED dari exit code (mode: exitCode / ask / none) | Must |
+| F8 | Jalankan banyak case (per file / per test run): batch command atau berurutan, bisa dibatalkan | Must |
+| F9 | Sisipkan marker untuk case yang sudah ada (cari via ID/summary) di test pada posisi kursor | Must |
+| F10 | Buat test case baru dari test di kursor (summary dari nama test, ditambahkan ke plan, marker disisipkan) | Should |
+| F11 | Buat test run dari plan (pilih/buat build, pilih case), otomatis jadi active run | Should |
+| F12 | Mapping report per plan + diagnostics untuk marker dengan ID yang tidak ada | Should |
+| F13 | Env var `TCMS_RUN_ID` / `TCMS_PLAN_ID` agar plugin resmi Kiwi melapor ke run yang sama | Should |
+
+## 5. Kebutuhan non-fungsional
+
+- Tanpa dependency runtime (hanya Node built-in + API VS Code), ringan saat aktivasi.
+- Scan workspace hingga 20 ribu file dengan batas ukuran file 2 MB, berjalan di background.
+- Tidak menyimpan credential di settings atau log.
+- Bekerja di Windows, macOS, dan Linux; shell mengikuti default terminal VS Code.
+
+## 6. Alur utama
+
+1. **Setup**: Sign In, isi `kiwi.run.command`, pilih active run.
+2. **Mapping**: buka test, lalu *Link Test to Existing Test Case* (atau *Create Test Case from Test*), dan marker tersisip.
+3. **Eksekusi**: klik `Run` di CodeLens atau *Run Automated Cases of Test Run*; task berjalan dan status di Kiwi ter-update.
+4. **Manual**: klik `Pass` / `Fail` (opsional dengan komentar) di tree atau CodeLens.
+5. **Review**: *Show Mapping Report* untuk melihat coverage mapping per plan.
+
+## 7. Metrik keberhasilan
+
+- Membuka web Kiwi hanya untuk administrasi/reporting, tidak untuk eksekusi harian.
+- 100% case automated di plan aktif ter-mapping ke kode (terukur dari mapping report).
+- Waktu dari "pilih case" sampai "test berjalan" kurang dari 5 detik.
+
+## 8. Pengembangan berikutnya
+
+- Native VS Code Testing API (Test Explorer) dengan hasil per case dari JUnit XML.
+- Parsing hasil batch per case (JUnit XML / output framework) untuk pelaporan granular.
+- Filter run "assigned to me", attachment log/screenshot ke execution.
+- Edit text/steps test case dari editor.

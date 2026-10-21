@@ -1,0 +1,300 @@
+{
+  "name": "kiwi-tcms-connector",
+  "displayName": "Kiwi TCMS Connector",
+  "description": "Manage Kiwi TCMS test plans, runs and cases from VS Code, map them to your automated tests and execute them without leaving the editor.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "kiwi",
+    "tcms",
+    "test management",
+    "test case",
+    "test run"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kiwi",
+          "title": "Kiwi TCMS",
+          "icon": "resources/kiwi.svg"
+        }
+      ]
+    },
+    "views": {
+      "kiwi": [
+        {
+          "id": "kiwi.runs",
+          "name": "Test Runs"
+        },
+        {
+          "id": "kiwi.plans",
+          "name": "Test Plans"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "kiwi.runs",
+        "contents": "Connect to your Kiwi TCMS instance to see test runs and report results from the editor.\n[Sign In](command:kiwi.signIn)",
+        "when": "!kiwi.connected"
+      },
+      {
+        "view": "kiwi.plans",
+        "contents": "Sign in to browse test plans and map test cases to your code.\n[Sign In](command:kiwi.signIn)",
+        "when": "!kiwi.connected"
+      }
+    ],
+    "commands": [
+      { "command": "kiwi.signIn", "title": "Sign In", "category": "Kiwi", "icon": "$(plug)" },
+      { "command": "kiwi.signOut", "title": "Sign Out", "category": "Kiwi" },
+      { "command": "kiwi.refresh", "title": "Refresh", "category": "Kiwi", "icon": "$(refresh)" },
+      { "command": "kiwi.selectActiveRun", "title": "Select Active Test Run", "category": "Kiwi", "icon": "$(star-empty)" },
+      { "command": "kiwi.clearActiveRun", "title": "Clear Active Test Run", "category": "Kiwi" },
+      { "command": "kiwi.setExecutionStatus", "title": "Set Execution Status…", "category": "Kiwi", "icon": "$(edit)" },
+      { "command": "kiwi.markPassed", "title": "Mark as Passed", "category": "Kiwi", "icon": "$(pass)" },
+      { "command": "kiwi.markFailed", "title": "Mark as Failed", "category": "Kiwi", "icon": "$(error)" },
+      { "command": "kiwi.runCase", "title": "Run Test Case", "category": "Kiwi", "icon": "$(play)" },
+      { "command": "kiwi.runTestRun", "title": "Run Automated Cases of Test Run…", "category": "Kiwi", "icon": "$(run-all)" },
+      { "command": "kiwi.runFile", "title": "Run Kiwi Test Cases in Current File", "category": "Kiwi", "icon": "$(run-all)" },
+      { "command": "kiwi.openInBrowser", "title": "Open in Kiwi TCMS", "category": "Kiwi", "icon": "$(link-external)" },
+      { "command": "kiwi.openCaseDetails", "title": "Show Test Case Details", "category": "Kiwi", "icon": "$(preview)" },
+      { "command": "kiwi.goToCode", "title": "Go to Mapped Code", "category": "Kiwi", "icon": "$(go-to-file)" },
+      { "command": "kiwi.findCase", "title": "Find Test Case…", "category": "Kiwi", "icon": "$(search)" },
+      { "command": "kiwi.linkTestToCase", "title": "Link Test to Existing Test Case…", "category": "Kiwi" },
+      { "command": "kiwi.createCaseFromTest", "title": "Create Test Case from Test at Cursor…", "category": "Kiwi" },
+      { "command": "kiwi.createRun", "title": "Create Test Run…", "category": "Kiwi", "icon": "$(add)" },
+      { "command": "kiwi.addCaseToActiveRun", "title": "Add to Active Test Run", "category": "Kiwi", "icon": "$(add)" },
+      { "command": "kiwi.mappingReport", "title": "Show Mapping Report…", "category": "Kiwi", "icon": "$(checklist)" },
+      { "command": "kiwi.open", "title": "Open", "category": "Kiwi" }
+    ],
+    "keybindings": [
+      { "command": "kiwi.findCase", "key": "ctrl+alt+k", "mac": "cmd+alt+k" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "kiwi.open", "when": "false" },
+        { "command": "kiwi.addCaseToActiveRun", "when": "kiwi.connected && kiwi.hasActiveRun" },
+        { "command": "kiwi.clearActiveRun", "when": "kiwi.hasActiveRun" },
+        { "command": "kiwi.signOut", "when": "kiwi.connected" }
+      ],
+      "view/title": [
+        { "command": "kiwi.selectActiveRun", "when": "view == kiwi.runs && kiwi.connected", "group": "navigation@1" },
+        { "command": "kiwi.runTestRun", "when": "view == kiwi.runs && kiwi.hasActiveRun", "group": "navigation@2" },
+        { "command": "kiwi.refresh", "when": "view == kiwi.runs", "group": "navigation@9" },
+        { "command": "kiwi.createRun", "when": "view == kiwi.plans && kiwi.connected", "group": "navigation@1" },
+        { "command": "kiwi.findCase", "when": "view == kiwi.plans && kiwi.connected", "group": "navigation@2" },
+        { "command": "kiwi.refresh", "when": "view == kiwi.plans", "group": "navigation@9" },
+        { "command": "kiwi.signOut", "when": "view =~ /^kiwi\\./ && kiwi.connected", "group": "z_account" }
+      ],
+      "view/item/context": [
+        { "command": "kiwi.runTestRun", "when": "viewItem =~ /^run/", "group": "inline@1" },
+        { "command": "kiwi.selectActiveRun", "when": "viewItem == run", "group": "inline@2" },
+        { "command": "kiwi.selectActiveRun", "when": "viewItem == run", "group": "1_run@1" },
+        { "command": "kiwi.runTestRun", "when": "viewItem =~ /^run/", "group": "1_run@2" },
+        { "command": "kiwi.openInBrowser", "when": "viewItem =~ /^run/", "group": "9_open@1" },
+
+        { "command": "kiwi.runCase", "when": "viewItem =~ /^execution/", "group": "inline@1" },
+        { "command": "kiwi.markPassed", "when": "viewItem =~ /^execution/", "group": "inline@2" },
+        { "command": "kiwi.markFailed", "when": "viewItem =~ /^execution/", "group": "inline@3" },
+        { "command": "kiwi.runCase", "when": "viewItem =~ /^execution/", "group": "1_run@1" },
+        { "command": "kiwi.setExecutionStatus", "when": "viewItem =~ /^execution/", "group": "1_run@2" },
+        { "command": "kiwi.goToCode", "when": "viewItem =~ /^execution.*\\.mapped/", "group": "2_nav@1" },
+        { "command": "kiwi.openCaseDetails", "when": "viewItem =~ /^execution/", "group": "2_nav@2" },
+        { "command": "kiwi.openInBrowser", "when": "viewItem =~ /^execution/", "group": "9_open@1" },
+
+        { "command": "kiwi.createRun", "when": "viewItem == plan", "group": "1_run@1" },
+        { "command": "kiwi.mappingReport", "when": "viewItem == plan", "group": "1_run@2" },
+        { "command": "kiwi.mappingReport", "when": "viewItem == plan", "group": "inline@1" },
+        { "command": "kiwi.openInBrowser", "when": "viewItem == plan", "group": "9_open@1" },
+
+        { "command": "kiwi.runCase", "when": "viewItem =~ /^case/", "group": "inline@1" },
+        { "command": "kiwi.runCase", "when": "viewItem =~ /^case/", "group": "1_run@1" },
+        { "command": "kiwi.addCaseToActiveRun", "when": "viewItem =~ /^case/ && kiwi.hasActiveRun", "group": "1_run@2" },
+        { "command": "kiwi.goToCode", "when": "viewItem =~ /^case.*\\.mapped/", "group": "2_nav@1" },
+        { "command": "kiwi.openCaseDetails", "when": "viewItem =~ /^case/", "group": "2_nav@2" },
+        { "command": "kiwi.openInBrowser", "when": "viewItem =~ /^case/", "group": "9_open@1" }
+      ],
+      "editor/context": [
+        { "command": "kiwi.linkTestToCase", "when": "kiwi.connected && resourceScheme == file", "group": "kiwi@1" },
+        { "command": "kiwi.createCaseFromTest", "when": "kiwi.connected && resourceScheme == file", "group": "kiwi@2" },
+        { "command": "kiwi.runFile", "when": "resourceScheme == file", "group": "kiwi@3" }
+      ]
+    },
+    "taskDefinitions": [
+      {
+        "type": "kiwi",
+        "required": ["runToken"],
+        "properties": {
+          "runToken": { "type": "string", "description": "Internal identifier of a Kiwi TCMS test execution." }
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Kiwi TCMS",
+      "properties": {
+        "kiwi.url": {
+          "type": "string",
+          "default": "",
+          "order": 1,
+          "markdownDescription": "Base URL of your Kiwi TCMS instance, e.g. `https://tcms.example.com`. Set it with **Kiwi: Sign In**."
+        },
+        "kiwi.username": {
+          "type": "string",
+          "default": "",
+          "order": 2,
+          "description": "Kiwi TCMS username. The password is kept in VS Code's secret storage."
+        },
+        "kiwi.allowSelfSignedCertificate": {
+          "type": "boolean",
+          "default": false,
+          "order": 3,
+          "description": "Accept self-signed / untrusted TLS certificates (common for self-hosted Kiwi TCMS)."
+        },
+        "kiwi.product": {
+          "type": "string",
+          "default": "",
+          "order": 4,
+          "description": "Only show test plans and runs of this product (product name). Leave empty to show all."
+        },
+        "kiwi.runs.show": {
+          "type": "string",
+          "enum": ["active", "all"],
+          "enumDescriptions": ["Only runs that are not finished yet.", "All runs (can be slow on large instances)."],
+          "default": "active",
+          "description": "Which test runs to list in the Test Runs view."
+        },
+        "kiwi.runs.limit": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "description": "Maximum number of test runs shown (newest first)."
+        },
+        "kiwi.mapping.patterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [
+            "\\bkiwi\\(([\\d,\\s]+)\\)",
+            "\\bkiwi\\s*[:=]\\s*#?((?:\\d+\\s*,\\s*)*\\d+)",
+            "\\b(?:TC|KIWI)-(\\d+)\\b"
+          ],
+          "markdownDescription": "Regular expressions (case-insensitive) that find Kiwi test case IDs in your code. The first capture group must contain the ID (or a comma-separated list of IDs). Defaults match `@kiwi(123)`, `@pytest.mark.kiwi(1, 2)`, `# kiwi: 123`, `// kiwi=123` and `TC-123` / `KIWI-123` (tags, test names)."
+        },
+        "kiwi.mapping.include": {
+          "type": "string",
+          "default": "**/*.{py,robot,resource,java,kt,groovy,scala,js,mjs,cjs,ts,mts,jsx,tsx,cs,go,rb,php,feature}",
+          "description": "Glob of files scanned for test case markers."
+        },
+        "kiwi.mapping.exclude": {
+          "type": "string",
+          "default": "**/{node_modules,.git,.venv,venv,env,dist,build,out,target,bin,obj,__pycache__,.tox,.pytest_cache}/**",
+          "description": "Glob of files and folders excluded from marker scanning."
+        },
+        "kiwi.mapping.maxFiles": {
+          "type": "number",
+          "default": 20000,
+          "description": "Maximum number of files scanned for markers."
+        },
+        "kiwi.mapping.insertTemplates": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {},
+          "markdownDescription": "Marker text inserted by **Link Test to Existing Test Case** / **Create Test Case from Test**, per VS Code language id. `${id}` is replaced by the case ID. Built-in defaults: `# kiwi: ${id}` (Python, Ruby, shell…), `// kiwi: ${id}` (JS/TS, Java, Kotlin, C#, Go, PHP…), `TC-${id}` as a Robot Framework tag, `@TC-${id}` for Gherkin. Example override: `{ \"python\": \"@pytest.mark.kiwi(${id})\" }`. The inserted text must match one of `kiwi.mapping.patterns`."
+        },
+        "kiwi.mapping.validate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a warning in the Problems panel for markers that reference test cases which do not exist in Kiwi TCMS."
+        },
+        "kiwi.run.command": {
+          "type": "string",
+          "default": "",
+          "order": 10,
+          "markdownDescription": "Shell command that runs **one** test case. Variables: `${caseId}`, `${runId}`, `${executionId}`, `${planId}`, `${buildId}`, `${file}`, `${relativeFile}`, `${fileDirname}`, `${fileBasename}`, `${fileBasenameNoExtension}`, `${line}`, `${testName}`, `${testClass}`, `${pytestNodeId}`, `${summary}`, `${workspaceFolder}`, `${env:NAME}`. Examples:\n- custom runner: `python run.py --run-id ${runId} --case-id ${caseId}`\n- pytest: `pytest \"${pytestNodeId}\"`\n- Robot Framework: `robot --include TC-${caseId} tests`\n- Maven/JUnit: `mvn -q test -Dtest=${testClass}#${testName}`\n\nThe environment also gets `KIWI_RUN_ID`, `KIWI_CASE_ID`, `KIWI_CASE_IDS`, `KIWI_EXECUTION_ID`, `TCMS_RUN_ID`, `TCMS_PLAN_ID`, …"
+        },
+        "kiwi.run.batchCommand": {
+          "type": "string",
+          "default": "",
+          "order": 11,
+          "markdownDescription": "Optional shell command that runs **several** test cases at once (whole test run / file). Variables: `${caseIds}` (comma separated), `${caseIdsSpace}`, `${files}` (quoted, space separated), `${pytestNodeIds}`, `${runId}`, `${planId}`, `${buildId}`, `${workspaceFolder}`. Example: `python run.py --run-id ${runId} --case-ids ${caseIds}`. When empty, `kiwi.run.command` is executed once per case."
+        },
+        "kiwi.run.cwd": {
+          "type": "string",
+          "default": "${workspaceFolder}",
+          "description": "Working directory for test commands. Supports the same variables as kiwi.run.command."
+        },
+        "kiwi.run.env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {},
+          "description": "Extra environment variables for test commands. Values support the same variables as kiwi.run.command."
+        },
+        "kiwi.run.reportResult": {
+          "type": "string",
+          "enum": ["exitCode", "ask", "none"],
+          "enumDescriptions": [
+            "Set the execution in the active run to PASSED (exit code 0) or FAILED (non-zero).",
+            "Ask which status to report after each single test.",
+            "Do not report – your framework reports results to Kiwi itself. The view is refreshed afterwards."
+          ],
+          "default": "exitCode",
+          "description": "How results of tests started from VS Code are reported to the active test run."
+        },
+        "kiwi.run.markRunning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Set the execution status to RUNNING while the test is executing."
+        },
+        "kiwi.run.addComment": {
+          "type": "boolean",
+          "default": true,
+          "description": "Add a comment with the exit code to the execution when reporting a result."
+        },
+        "kiwi.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Kiwi CodeLens (summary, status, Run / Pass / Fail) above test case markers."
+        },
+        "kiwi.newCase.status": {
+          "type": "string",
+          "default": "CONFIRMED",
+          "description": "Status of test cases created from code (e.g. CONFIRMED, PROPOSED)."
+        },
+        "kiwi.newCase.priority": {
+          "type": "string",
+          "default": "",
+          "description": "Priority of test cases created from code (e.g. P1). Empty = first priority."
+        },
+        "kiwi.newCase.category": {
+          "type": "string",
+          "default": "",
+          "description": "Category name for test cases created from code. Empty = ask when the product has several categories."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
+    "package": "vsce package --skip-license"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "1.85.0",
+    "@vscode/vsce": "^3.2.1",
+    "typescript": "^5.6.3"
+  }
+}
