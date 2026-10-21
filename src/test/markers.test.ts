@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { compilePatterns, findMarkers, globToRegExp } from '../mapping/markers';
 
 const DEFAULTS = [
+  String.raw`\btcms\(\s*case_id\s*=\s*(\d+)\s*\)`,
   String.raw`\bkiwi\(([\d,\s]+)\)`,
   String.raw`\bkiwi\s*[:=]\s*#?((?:\d+\s*,\s*)*\d+)`,
   String.raw`\b(?:TC|KIWI)-(\d+)\b`,
@@ -51,4 +52,12 @@ test('globToRegExp handles **, * and braces', () => {
   assert.ok(exclude.test('node_modules/x/y.js'));
   assert.ok(exclude.test('pkg/.venv/lib/a.py'));
   assert.ok(!exclude.test('src/venv_tools.py'));
+});
+
+test('pytest tcms marker; depends_on and placeholder ids are ignored', () => {
+  assert.deepEqual(ids('@pytest.mark.tcms(case_id=37509)'), [37509]);
+  assert.deepEqual(ids('@pytest.mark.tcms( case_id = 12 )'), [12]);
+  assert.deepEqual(ids('@pytest.mark.depends_on(37509)'), []);
+  assert.deepEqual(ids('@pytest.mark.tcms(case_id=00000)'), []);
+  assert.deepEqual(ids('pytest tests/ui/e_admin/test_TC-37509_KeyCeremonyFIPS.py -v'), []);
 });

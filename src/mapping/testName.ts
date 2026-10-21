@@ -105,24 +105,34 @@ function robotTest(lines: string[], line: number): TestInfo {
 /**
  * Finds the test that a marker on `line` belongs to.
  * `extension` is the file extension including the dot (e.g. `.py`), used to pick language specific rules.
+ * A marker attached to a class / `describe` block yields only `testClass` (the whole class is the test).
  */
 export function detectTest(lines: string[], line: number, extension: string): TestInfo {
   const ext = extension.toLowerCase();
   if (ext === '.robot' || ext === '.resource') {
     return robotTest(lines, line);
   }
-  const at = (i: number): TestInfo => ({ testName: matchName(lines[i], DEF_PATTERNS), testClass: findClass(lines, i), definitionLine: i });
+  const at = (i: number): TestInfo | undefined => {
+    const testName = matchName(lines[i], DEF_PATTERNS);
+    if (testName) {
+      return { testName, testClass: findClass(lines, i), definitionLine: i };
+    }
+    const testClass = matchName(lines[i], CLASS_PATTERNS);
+    return testClass ? { testClass, definitionLine: i } : undefined;
+  };
 
   const here = lines[line] ?? '';
-  if (matchName(here, DEF_PATTERNS)) {
-    return at(line);
+  const onLine = at(line);
+  if (onLine) {
+    return onLine;
   }
 
   // Marker in a comment / decorator / annotation directly above the definition.
   if (ANNOTATION_LINE.test(here)) {
     for (let i = line + 1; i < Math.min(lines.length, line + 20); i++) {
-      if (matchName(lines[i], DEF_PATTERNS)) {
-        return at(i);
+      const found = at(i);
+      if (found) {
+        return found;
       }
       if (!ANNOTATION_LINE.test(lines[i])) {
         break;
@@ -134,11 +144,26 @@ export function detectTest(lines: string[], line: number, extension: string): Te
   const indent = indentOf(here);
   for (let i = line - 1; i >= Math.max(0, line - 300); i--) {
     const text = lines[i];
-    if (text.trim() && indentOf(text) < indent && matchName(text, DEF_PATTERNS)) {
-      return at(i);
+    const found = text.trim() && indentOf(text) < indent ? at(i) : undefined;
+    if (found) {
+      return found;
     }
   }
   return {};
+}
+
+/** Title from an Allure decorator right above the definition, e.g. `@allure.title("[E2E] Login")`. */
+export function detectTitle(lines: string[], definitionLine: number): string | undefined {
+  for (let i = definitionLine - 1; i >= Math.max(0, definitionLine - 20); i--) {
+    const m = /^\s*@allure\.title\(\s*(['"])(.*?)\1\s*\)/.exec(lines[i]);
+    if (m) {
+      return m[2];
+    }
+    if (lines[i].trim() && !ANNOTATION_LINE.test(lines[i]) && !/^\s*\)/.test(lines[i])) {
+      break;
+    }
+  }
+  return undefined;
 }
 
 /** `test_login_with_valid_user` / `testLoginWithValidUser` → `Login with valid user` */
@@ -148,7 +173,7 @@ export function humanizeTestName(name: string | undefined): string {
   }
   let text = name
     .replace(/^test[_\s]+/i, '')
-    .replace(/^test(?=[A-Z])/, '')
+    .replace(/^[Tt]est(?=[A-Z])/, '')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/[_]+/g, ' ')
     .replace(/\s+/g, ' ')

@@ -10,9 +10,9 @@ export function truncate(text: string, max: number): string {
   return single.length > max ? single.slice(0, max - 1) + '…' : single;
 }
 
-/** `https://tcms.example.com/` or `.../json-rpc/` → `https://tcms.example.com` */
+/** `https://tcms.example.com/`, `.../json-rpc/` or `.../xml-rpc/` → `https://tcms.example.com` */
 export function normalizeBaseUrl(url: string): string {
-  return url.trim().replace(/\/+$/, '').replace(/\/json-rpc$/i, '');
+  return url.trim().replace(/\/+$/, '').replace(/\/(?:json|xml)-rpc$/i, '');
 }
 
 export function caseLabel(id: number): string {

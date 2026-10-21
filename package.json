@@ -185,11 +185,12 @@
           "type": "array",
           "items": { "type": "string" },
           "default": [
+            "\\btcms\\(\\s*case_id\\s*=\\s*(\\d+)\\s*\\)",
             "\\bkiwi\\(([\\d,\\s]+)\\)",
             "\\bkiwi\\s*[:=]\\s*#?((?:\\d+\\s*,\\s*)*\\d+)",
             "\\b(?:TC|KIWI)-(\\d+)\\b"
           ],
-          "markdownDescription": "Regular expressions (case-insensitive) that find Kiwi test case IDs in your code. The first capture group must contain the ID (or a comma-separated list of IDs). Defaults match `@kiwi(123)`, `@pytest.mark.kiwi(1, 2)`, `# kiwi: 123`, `// kiwi=123` and `TC-123` / `KIWI-123` (tags, test names)."
+          "markdownDescription": "Regular expressions (case-insensitive) that find Kiwi test case IDs in your code. The first capture group must contain the ID (or a comma-separated list of IDs). Defaults match `@pytest.mark.tcms(case_id=123)`, `@kiwi(123)`, `@pytest.mark.kiwi(1, 2)`, `# kiwi: 123`, `// kiwi=123` and `TC-123` / `KIWI-123` (tags, test names)."
         },
         "kiwi.mapping.include": {
           "type": "string",
@@ -228,6 +229,18 @@
           "default": "",
           "order": 11,
           "markdownDescription": "Optional shell command that runs **several** test cases at once (whole test run / file). Variables: `${caseIds}` (comma separated), `${caseIdsSpace}`, `${files}` (quoted, space separated), `${pytestNodeIds}`, `${runId}`, `${planId}`, `${buildId}`, `${workspaceFolder}`. Example: `python run.py --run-id ${runId} --case-ids ${caseIds}`. When empty, `kiwi.run.command` is executed once per case."
+        },
+        "kiwi.run.commandWithoutRun": {
+          "type": "string",
+          "default": "",
+          "order": 12,
+          "markdownDescription": "Optional variant of `kiwi.run.command` used when the test case is **not** part of the active test run (or no run is active), e.g. the same command without `--kiwi-run-id`. Falls back to `kiwi.run.command`."
+        },
+        "kiwi.run.batchCommandWithoutRun": {
+          "type": "string",
+          "default": "",
+          "order": 13,
+          "markdownDescription": "Optional variant of `kiwi.run.batchCommand` used when none of the selected test cases is part of the active test run. Falls back to `kiwi.run.batchCommand`."
         },
         "kiwi.run.cwd": {
           "type": "string",

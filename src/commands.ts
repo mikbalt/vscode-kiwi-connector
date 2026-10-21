@@ -4,7 +4,7 @@ import { getSettings } from './config';
 import type { Build, ExecutionStatus, TestCase, TestExecution, TestPlan, TestRun } from './kiwi/types';
 import type { Marker, MarkerIndex } from './mapping/index';
 import { documentLines, insertMarker } from './mapping/insert';
-import { detectTest, humanizeTestName } from './mapping/testName';
+import { detectTest, detectTitle, humanizeTestName } from './mapping/testName';
 import type { RunTarget, TestRunner } from './runner';
 import { NotConnectedError, type Session, type StatusKind } from './session';
 import type { ActiveRunStore } from './state/activeRun';
@@ -441,11 +441,14 @@ export function registerCommands(d: Deps): void {
     }
     const api = session.api;
     const doc = editor.document;
-    const info = detectTest(documentLines(doc), editor.selection.active.line, path.extname(doc.fileName));
+    const lines = documentLines(doc);
+    const info = detectTest(lines, editor.selection.active.line, path.extname(doc.fileName));
+    const title = info.definitionLine !== undefined ? detectTitle(lines, info.definitionLine) : undefined;
+    const testRef = [info.testClass, info.testName].filter(Boolean).join('.') || undefined;
     const summary = await vscode.window.showInputBox({
       title: 'New Kiwi test case (1/2): summary',
-      value: humanizeTestName(info.testName),
-      prompt: info.testName ? `Detected test: ${info.testClass ? info.testClass + '.' : ''}${info.testName}` : 'No test definition detected at the cursor',
+      value: title ?? humanizeTestName(info.testName ?? info.testClass),
+      prompt: testRef ? `Detected test: ${testRef}` : 'No test definition detected at the cursor',
       validateInput: (v) => (v.trim() ? undefined : 'Summary is required'),
     });
     if (!summary) {
@@ -483,7 +486,6 @@ export function registerCommands(d: Deps): void {
       throw new Error('Kiwi TCMS has no priorities or test case statuses configured.');
     }
     const relativeFile = vscode.workspace.asRelativePath(doc.uri, false).replace(/\\/g, '/');
-    const testRef = info.testName ? `${info.testClass ? info.testClass + '.' : ''}${info.testName}` : undefined;
     const created = await api.createCase({
       summary: summary.trim(),
       product: plan.product,

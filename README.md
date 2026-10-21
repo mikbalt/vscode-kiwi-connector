@@ -42,6 +42,17 @@ Kelola test case dan test run [Kiwi TCMS](https://kiwitcms.org) langsung dari VS
 4. Pilih active run: klik item **Kiwi** di status bar, atau ⭐ di view *Test Runs*.
 5. Buka file test, lihat CodeLens di atas marker, klik **Run**.
 
+Command yang dipakai bergantung pada apakah case itu ada di active run:
+
+| Setting | Dipakai saat |
+|---|---|
+| `kiwi.run.command` | case ada di active run (hasil dilaporkan ke run tsb) |
+| `kiwi.run.commandWithoutRun` | case tidak ada di active run / belum ada active run (jalan lokal saja). Fallback ke `kiwi.run.command` |
+| `kiwi.run.batchCommand` | beberapa case sekaligus (per file / per test run) |
+| `kiwi.run.batchCommandWithoutRun` | batch yang tidak satu pun case-nya ada di active run. Fallback ke `kiwi.run.batchCommand` |
+
+Kalau framework melapor sendiri (`kiwi.run.reportResult: "none"`), extension hanya men-set RUNNING sebelum test jalan, lalu mengembalikan status sebelumnya untuk execution yang tidak mendapat hasil (test di-skip, di-deselect, atau crash).
+
 ## Variabel untuk command
 
 | Variabel | Isi |
@@ -52,13 +63,36 @@ Kelola test case dan test run [Kiwi TCMS](https://kiwitcms.org) langsung dari VS
 | `${executionId}` | ID TestExecution case tsb di active run |
 | `${file}`, `${relativeFile}`, `${fileDirname}`, `${fileBasename}`, `${fileBasenameNoExtension}`, `${line}` | Lokasi marker |
 | `${testName}`, `${testClass}` | Nama test/class yang terdeteksi di dekat marker |
-| `${pytestNodeId}` / `${pytestNodeIds}` | `tests/test_a.py::TestX::test_y` (single / batch, sudah dikutip) |
+| `${pytestNodeId}` / `${pytestNodeIds}` | `tests/test_a.py::TestX::test_y`, atau `tests/test_a.py::TestX` kalau marker di class (single / batch, batch sudah dikutip) |
 | `${files}` | File yang ter-mapping, dikutip & dipisah spasi (batch) |
 | `${summary}`, `${workspaceFolder}`, `${env:NAMA}` | — |
 
 Kalau variabel yang dipakai tidak tersedia (misalnya `${runId}` padahal belum ada active run), test tidak dijalankan dan muncul pesan yang menjelaskan alasannya.
 
 Environment variable yang juga di-set: `KIWI_URL`, `KIWI_RUN_ID`, `KIWI_CASE_ID`, `KIWI_CASE_IDS`, `KIWI_EXECUTION_ID`, `KIWI_PLAN_ID`, `KIWI_BUILD_ID`, `KIWI_TEST_FILE`, `KIWI_TEST_NAME`, serta `TCMS_RUN_ID` dan `TCMS_PLAN_ID`, yang dibaca plugin resmi Kiwi (`tcms-api`, kiwitcms-pytest-plugin, robotframework plugin, dll.) supaya hasil masuk ke run yang sama.
+
+### Contoh: pytest plugin dengan `@pytest.mark.tcms(case_id=N)` dan `--kiwi-run-id`
+
+Untuk framework yang memetakan test lewat `@pytest.mark.tcms(case_id=N)` (bisa di level class) dan melapor sendiri ke Kiwi dengan `--kiwi-run-id=N`:
+
+```jsonc
+{
+  "kiwi.allowSelfSignedCertificate": true,
+  // hanya marker tcms yang dianggap mapping (hindari "TC-123" di docstring/komentar)
+  "kiwi.mapping.patterns": ["\\btcms\\(\\s*case_id\\s*=\\s*(\\d+)\\s*\\)"],
+  "kiwi.mapping.include": "tests/**/*.py",
+  "kiwi.mapping.insertTemplates": { "python": "@pytest.mark.tcms(case_id=${id})" },
+
+  // --kiwi-no-block: jangan tandai case lain di run sebagai BLOCKED
+  "kiwi.run.command": "venv\\Scripts\\python.exe -m pytest \"${pytestNodeId}\" --kiwi-run-id=${runId} --kiwi-no-block",
+  "kiwi.run.batchCommand": "venv\\Scripts\\python.exe -m pytest ${pytestNodeIds} --kiwi-run-id=${runId} --kiwi-no-block",
+  "kiwi.run.commandWithoutRun": "venv\\Scripts\\python.exe -m pytest \"${pytestNodeId}\"",
+  "kiwi.run.batchCommandWithoutRun": "venv\\Scripts\\python.exe -m pytest ${pytestNodeIds}",
+  "kiwi.run.reportResult": "none"
+}
+```
+
+Marker di level class menghasilkan `${pytestNodeId}` = `tests/x/test_a.py::TestClass` (semua method di class ikut jalan). Kalau satu case di-mapping ke beberapa test, batch run menjalankan semuanya.
 
 ### Contoh per framework
 
@@ -85,6 +119,7 @@ Environment variable yang juga di-set: `KIWI_URL`, `KIWI_RUN_ID`, `KIWI_CASE_ID`
 Pola default (case-insensitive, bisa diganti lewat `kiwi.mapping.patterns`):
 
 ```python
+@pytest.mark.tcms(case_id=123)   # pytest marker (di class atau function)
 # kiwi: 123                      # komentar (bisa juga "kiwi=123", "kiwi: 1, 2")
 @pytest.mark.kiwi(123)           # decorator / annotation: kiwi(123), @Kiwi(1, 2)
 def test_login(): ...

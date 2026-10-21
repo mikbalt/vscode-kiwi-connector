@@ -28,6 +28,14 @@ interface Resolved {
 
 type Outcome = 'passed' | 'failed' | 'stopped' | 'skipped';
 
+interface RunningState {
+  /** Execution id → status id before it was set to RUNNING. */
+  previous: Map<number, number>;
+  runningId?: number;
+}
+
+const NOT_RUNNING: RunningState = { previous: new Map() };
+
 /** Executes test cases with the user's framework (as VS Code tasks) and reports results to the active run. */
 export class TestRunner {
   constructor(
@@ -44,8 +52,8 @@ export class TestRunner {
       void vscode.window.showInformationMessage('Kiwi TCMS: nothing to run.');
       return;
     }
-    const useBatch = targets.length > 1 && !!s.batchCommand;
-    if (!s.runCommand && !useBatch) {
+    const useBatch = targets.length > 1 && !!(s.batchCommand || s.batchCommandWithoutRun);
+    if (!s.runCommand && !s.runCommandWithoutRun && !useBatch) {
       const pick = await vscode.window.showWarningMessage(
         'Kiwi TCMS: configure "kiwi.run.command" so the extension knows how to execute a test case with your framework.',
         'Open Settings',
@@ -80,17 +88,21 @@ export class TestRunner {
       return 'skipped';
     }
     const vars = this.variables([resolved], false);
-    const command = this.render(s.runCommand, vars, [resolved], interactive);
+    // Cases outside the active run use the "without run" variant (e.g. without --kiwi-run-id).
+    const template = resolved.execution
+      ? s.runCommand || s.runCommandWithoutRun
+      : s.runCommandWithoutRun || s.runCommand;
+    const command = this.render(template, vars, [resolved], interactive);
     if (command === undefined) {
       return 'skipped';
     }
     const executions = resolved.execution ? [resolved.execution] : [];
-    const previous = s.markRunning ? await this.markRunning(executions) : new Map<number, number>();
+    const running = s.markRunning ? await this.markRunning(executions) : NOT_RUNNING;
 
     this.log.info(`Running ${caseLabel(target.caseId)}: ${command}`);
     const exitCode = await this.executeTask(caseLabel(target.caseId), command, vars);
     const mode: ReportMode = !interactive && s.reportResult === 'ask' ? 'exitCode' : s.reportResult;
-    await this.report(executions, [target.caseId], exitCode, mode, false, previous);
+    await this.report(executions, [target.caseId], exitCode, mode, false, running);
     return exitCode === undefined ? 'stopped' : exitCode === 0 ? 'passed' : 'failed';
   }
 
@@ -122,24 +134,33 @@ export class TestRunner {
 
   private async runBatch(targets: RunTarget[]): Promise<void> {
     const s = getSettings();
+    // A case mapped to several tests runs all of them, unless a specific location was requested.
     const resolved: Resolved[] = [];
     for (const target of targets) {
-      const r = await this.resolve(target, false);
-      if (r) {
-        resolved.push(r);
+      const markers = target.uri ? [] : this.index.markersForCase(target.caseId);
+      const locations = markers.length > 1 ? markers.map((m) => ({ ...target, uri: m.uri, line: m.range.start.line })) : [target];
+      for (const location of locations) {
+        const r = await this.resolve(location, false);
+        if (r) {
+          resolved.push(r);
+        }
       }
     }
+    const caseIds = unique(resolved.map((r) => r.caseId));
     const vars = this.variables(resolved, true);
-    const command = this.render(s.batchCommand, vars, resolved, true);
+    const executions = unique(resolved.map((r) => r.execution).filter((e): e is TestExecution => !!e));
+    const template = executions.length
+      ? s.batchCommand || s.batchCommandWithoutRun
+      : s.batchCommandWithoutRun || s.batchCommand;
+    const command = this.render(template, vars, resolved, true);
     if (command === undefined) {
       return;
     }
-    const executions = resolved.map((r) => r.execution).filter((e): e is TestExecution => !!e);
-    const previous = s.markRunning ? await this.markRunning(executions) : new Map<number, number>();
+    const running = s.markRunning ? await this.markRunning(executions) : NOT_RUNNING;
 
-    this.log.info(`Running ${resolved.length} test case(s): ${command}`);
-    const exitCode = await this.executeTask(`${resolved.length} test cases`, command, vars);
-    await this.report(executions, resolved.map((r) => r.caseId), exitCode, s.reportResult === 'ask' ? 'exitCode' : s.reportResult, true, previous);
+    this.log.info(`Running ${caseIds.length} test case(s): ${command}`);
+    const exitCode = await this.executeTask(`${caseIds.length} test cases`, command, vars);
+    await this.report(executions, caseIds, exitCode, s.reportResult === 'ask' ? 'exitCode' : s.reportResult, true, running);
   }
 
   // ---- resolution -----------------------------------------------------------
@@ -185,11 +206,12 @@ export class TestRunner {
     const folder = marker ? vscode.workspace.getWorkspaceFolder(marker.uri) : vscode.workspace.workspaceFolders?.[0];
     const file = marker?.uri.fsPath;
     const relative = (uri: vscode.Uri) => vscode.workspace.asRelativePath(uri, false).replace(/\\/g, '/');
+    // `file.py::Class::test`, or `file.py::Class` when the marker is on the class.
     const nodeId = (r: Resolved) =>
-      r.marker && r.info.testName && path.extname(r.marker.uri.fsPath) === '.py'
-        ? `${relative(r.marker.uri)}::${r.info.testClass ? r.info.testClass + '::' : ''}${r.info.testName}`
+      r.marker && (r.info.testName || r.info.testClass) && path.extname(r.marker.uri.fsPath) === '.py'
+        ? [relative(r.marker.uri), r.info.testClass, r.info.testName].filter(Boolean).join('::')
         : undefined;
-    const ids = resolved.map((r) => String(r.caseId));
+    const ids = unique(resolved.map((r) => String(r.caseId)));
     const mappedFiles = unique(resolved.filter((r) => r.marker).map((r) => r.marker!.uri.fsPath));
     const nodeIds = resolved.map(nodeId).filter((n): n is string => !!n);
 
@@ -225,7 +247,8 @@ export class TestRunner {
       if (!(err instanceof MissingVariableError)) {
         throw err;
       }
-      const subject = resolved.length === 1 ? caseLabel(resolved[0].caseId) : `${resolved.length} test cases`;
+      const caseCount = unique(resolved.map((r) => r.caseId)).length;
+      const subject = caseCount === 1 ? caseLabel(resolved[0].caseId) : `${caseCount} test cases`;
       const message = `Cannot run ${subject}: \${${err.variable}} is not available — ${this.hint(err.variable, resolved)}`;
       this.log.warn(message);
       if (interactive) {
@@ -333,11 +356,11 @@ export class TestRunner {
     });
   }
 
-  /** Sets executions to RUNNING and returns their previous status ids. */
-  private async markRunning(executions: TestExecution[]): Promise<Map<number, number>> {
+  /** Sets executions to RUNNING, remembering their previous status so it can be restored. */
+  private async markRunning(executions: TestExecution[]): Promise<RunningState> {
     const previous = new Map<number, number>();
     if (!executions.length) {
-      return previous;
+      return NOT_RUNNING;
     }
     try {
       const running = await this.session.findStatus('RUNNING');
@@ -346,24 +369,26 @@ export class TestRunner {
           await this.session.setExecutionStatus(e.id, running.id);
           previous.set(e.id, e.status);
         });
+        return { previous, runningId: running.id };
       }
     } catch (err) {
       this.log.warn(`Could not set RUNNING status: ${errorMessage(err)}`);
     }
-    return previous;
+    return { previous };
   }
 
-  private async restore(previous: Map<number, number>, onlyIfStatus?: number): Promise<void> {
-    if (!previous.size) {
+  /** Restores executions that are still RUNNING (i.e. nobody reported a result for them). */
+  private async restore(state: RunningState): Promise<void> {
+    if (!state.previous.size || state.runningId === undefined) {
       return;
     }
     try {
-      let ids = [...previous.keys()];
-      if (onlyIfStatus !== undefined) {
-        const current = await this.session.api.filterExecutions({ pk__in: ids });
-        ids = current.filter((e) => e.status === onlyIfStatus).map((e) => e.id);
+      const current = await this.session.api.filterExecutions({ pk__in: [...state.previous.keys()] });
+      const stale = current.filter((e) => e.status === state.runningId).map((e) => e.id);
+      await mapLimit(stale, 6, (id) => this.session.api.updateExecution(id, { status: state.previous.get(id) }));
+      if (stale.length) {
+        this.log.info(`Restored the previous status of ${stale.length} execution(s) that received no result.`);
       }
-      await mapLimit(ids, 6, (id) => this.session.api.updateExecution(id, { status: previous.get(id) }));
     } catch (err) {
       this.log.warn(`Could not restore execution status: ${errorMessage(err)}`);
     }
@@ -375,14 +400,14 @@ export class TestRunner {
     exitCode: number | undefined,
     mode: ReportMode,
     batch: boolean,
-    previous: Map<number, number>,
+    running: RunningState,
   ): Promise<void> {
     const subject = caseIds.length === 1 ? caseLabel(caseIds[0]) : `${caseIds.length} test cases`;
     const s = getSettings();
     this.log.info(`${subject} finished with exit code ${exitCode ?? '(none)'}`);
 
     if (exitCode === undefined) {
-      await this.restore(previous);
+      await this.restore(running);
       void vscode.window.showWarningMessage(`Kiwi TCMS: ${subject} was stopped before finishing; no result was reported.`);
       return;
     }
@@ -396,11 +421,12 @@ export class TestRunner {
       return;
     }
     if (mode === 'none') {
+      // The framework reports itself; undo RUNNING for cases it did not report (skipped, deselected, crashed).
+      await this.restore(running);
       return;
     }
     if (batch && exitCode !== 0) {
-      const running = await this.session.findStatus('RUNNING').catch(() => undefined);
-      await this.restore(previous, running?.id);
+      await this.restore(running);
       void vscode.window.showWarningMessage(
         `Kiwi TCMS: batch finished with exit code ${exitCode}. Individual results were not reported — let your framework report them, or mark them in the Test Runs view.`,
       );
@@ -419,7 +445,7 @@ export class TestRunner {
       );
       status = statuses.find((st) => st.name === choice);
       if (!status) {
-        await this.restore(previous);
+        await this.restore(running);
         return;
       }
     }

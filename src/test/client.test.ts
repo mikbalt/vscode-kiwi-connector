@@ -64,6 +64,7 @@ test('logs in, sends the session cookie and decodes results', async () => {
 
 test('accepts URLs ending with /json-rpc/', () => {
   assert.equal(new KiwiClient('https://tcms.example.com/json-rpc/').baseUrl, 'https://tcms.example.com');
+  assert.equal(new KiwiClient('https://10.88.1.13/xml-rpc/').baseUrl, 'https://10.88.1.13');
 });
 
 test('wrong password surfaces the RPC error', async () => {

@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { detectTest, humanizeTestName } from '../mapping/testName';
+import { detectTest, detectTitle, humanizeTestName } from '../mapping/testName';
 
 const lines = (s: string) => s.split('\n');
 
@@ -50,4 +50,33 @@ test('humanizeTestName', () => {
   assert.equal(humanizeTestName('test_login_with_valid_user'), 'Login with valid user');
   assert.equal(humanizeTestName('testLoginWithValidUser'), 'Login with valid user');
   assert.equal(humanizeTestName(undefined), '');
+});
+
+test('pytest: tcms marker on a class (sphere e2e framework style)', () => {
+  const src = lines(
+    [
+      '@allure.feature("Key Ceremony")',
+      '@pytest.mark.e_admin',
+      '@pytest.mark.tcms(case_id=37509)',
+      'class TestKeyCeremonyFIPSFlow:',
+      '',
+      '    @allure.title("[E2E][e-admin][Key Ceremony] Key ceremony FIPS mode (Flow)")',
+      '    @pytest.mark.order(1)',
+      '    def test_fips_key_ceremony_password(self):',
+      '        pass',
+    ].join('\n'),
+  );
+  assert.deepEqual(detectTest(src, 2, '.py'), { testClass: 'TestKeyCeremonyFIPSFlow', definitionLine: 3 });
+  // Cursor inside the method still resolves to the method.
+  assert.deepEqual(detectTest(src, 8, '.py'), { testName: 'test_fips_key_ceremony_password', testClass: 'TestKeyCeremonyFIPSFlow', definitionLine: 7 });
+});
+
+test('detectTitle reads @allure.title above the definition', () => {
+  const src = lines(['    @allure.title("[E2E][PKCS11] RSA key pair")', '    @allure.severity(allure.severity_level.CRITICAL)', '    def test_rsa(self):'].join('\n'));
+  assert.equal(detectTitle(src, 2), '[E2E][PKCS11] RSA key pair');
+  assert.equal(detectTitle(lines('x = 1\ndef test_a():'), 1), undefined);
+});
+
+test('humanizeTestName strips a Test class prefix', () => {
+  assert.equal(humanizeTestName('TestKeyCeremonyFIPSFlow'), 'Key ceremony fipsflow');
 });

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 export const DEFAULT_PATTERNS = [
+  String.raw`\btcms\(\s*case_id\s*=\s*(\d+)\s*\)`,
   String.raw`\bkiwi\(([\d,\s]+)\)`,
   String.raw`\bkiwi\s*[:=]\s*#?((?:\d+\s*,\s*)*\d+)`,
   String.raw`\b(?:TC|KIWI)-(\d+)\b`,
@@ -68,7 +69,9 @@ export interface KiwiSettings {
   insertTemplates: Record<string, string>;
   validateMapping: boolean;
   runCommand: string;
+  runCommandWithoutRun: string;
   batchCommand: string;
+  batchCommandWithoutRun: string;
   runCwd: string;
   runEnv: Record<string, string>;
   reportResult: ReportMode;
@@ -96,7 +99,9 @@ export function getSettings(): KiwiSettings {
     insertTemplates: { ...DEFAULT_INSERT_TEMPLATES, ...c.get<Record<string, string>>('mapping.insertTemplates', {}) },
     validateMapping: c.get<boolean>('mapping.validate', true),
     runCommand: (c.get<string>('run.command') ?? '').trim(),
+    runCommandWithoutRun: (c.get<string>('run.commandWithoutRun') ?? '').trim(),
     batchCommand: (c.get<string>('run.batchCommand') ?? '').trim(),
+    batchCommandWithoutRun: (c.get<string>('run.batchCommandWithoutRun') ?? '').trim(),
     runCwd: c.get<string>('run.cwd', '${workspaceFolder}'),
     runEnv: c.get<Record<string, string>>('run.env', {}),
     reportResult: c.get<ReportMode>('run.reportResult', 'exitCode'),
