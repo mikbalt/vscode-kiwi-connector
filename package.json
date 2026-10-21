@@ -2,8 +2,12 @@
   "name": "kiwi-tcms-connector",
   "displayName": "Kiwi TCMS Connector",
   "description": "Manage Kiwi TCMS test plans, runs and cases from VS Code, map them to your automated tests and execute them without leaving the editor.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "local",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mikbalt/vscode-kiwi-connector.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -47,7 +51,7 @@
     "viewsWelcome": [
       {
         "view": "kiwi.runs",
-        "contents": "Connect to your Kiwi TCMS instance to see test runs and report results from the editor.\n[Sign In](command:kiwi.signIn)",
+        "contents": "Connect to your Kiwi TCMS instance to see test runs and report results from the editor.\n[Sign In](command:kiwi.signIn)\nNew here? [Open the user guide](command:kiwi.openUserGuide)",
         "when": "!kiwi.connected"
       },
       {
@@ -77,6 +81,7 @@
       { "command": "kiwi.createRun", "title": "Create Test Run…", "category": "Kiwi", "icon": "$(add)" },
       { "command": "kiwi.addCaseToActiveRun", "title": "Add to Active Test Run", "category": "Kiwi", "icon": "$(add)" },
       { "command": "kiwi.mappingReport", "title": "Show Mapping Report…", "category": "Kiwi", "icon": "$(checklist)" },
+      { "command": "kiwi.openUserGuide", "title": "Open User Guide", "category": "Kiwi", "icon": "$(question)" },
       { "command": "kiwi.open", "title": "Open", "category": "Kiwi" }
     ],
     "keybindings": [
@@ -90,11 +95,14 @@
         { "command": "kiwi.signOut", "when": "kiwi.connected" }
       ],
       "view/title": [
+        { "command": "kiwi.createRun", "when": "view == kiwi.runs && kiwi.connected", "group": "navigation@0" },
         { "command": "kiwi.selectActiveRun", "when": "view == kiwi.runs && kiwi.connected", "group": "navigation@1" },
+        { "command": "kiwi.openUserGuide", "when": "view == kiwi.runs", "group": "navigation@8" },
         { "command": "kiwi.runTestRun", "when": "view == kiwi.runs && kiwi.hasActiveRun", "group": "navigation@2" },
         { "command": "kiwi.refresh", "when": "view == kiwi.runs", "group": "navigation@9" },
         { "command": "kiwi.createRun", "when": "view == kiwi.plans && kiwi.connected", "group": "navigation@1" },
         { "command": "kiwi.findCase", "when": "view == kiwi.plans && kiwi.connected", "group": "navigation@2" },
+        { "command": "kiwi.openUserGuide", "when": "view == kiwi.plans", "group": "navigation@8" },
         { "command": "kiwi.refresh", "when": "view == kiwi.plans", "group": "navigation@9" },
         { "command": "kiwi.signOut", "when": "view =~ /^kiwi\\./ && kiwi.connected", "group": "z_account" }
       ],

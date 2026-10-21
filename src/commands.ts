@@ -189,6 +189,14 @@ export function registerCommands(d: Deps): void {
     void vscode.window.showInformationMessage('Signed out of Kiwi TCMS.');
   });
   register('kiwi.refresh', () => d.refreshAll());
+  register('kiwi.openUserGuide', async () => {
+    const guide = vscode.Uri.joinPath(d.context.extensionUri, 'docs', 'USER_GUIDE.md');
+    try {
+      await vscode.commands.executeCommand('markdown.showPreview', guide);
+    } catch {
+      await vscode.window.showTextDocument(guide, { preview: true });
+    }
+  });
 
   // ---- active run -----------------------------------------------------------
 

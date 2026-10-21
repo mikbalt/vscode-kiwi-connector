@@ -1,5 +1,7 @@
 # Kiwi TCMS Connector untuk VS Code
 
+> 📖 **Panduan pemakaian lengkap: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)** (bisa dibuka di VS Code lewat **Kiwi: Open User Guide**).
+
 Kelola test case dan test run [Kiwi TCMS](https://kiwitcms.org) langsung dari VS Code, hubungkan (mapping) test case ke kode automation kamu, lalu jalankan test dan laporkan hasilnya tanpa membuka web Kiwi.
 
 ## Fitur

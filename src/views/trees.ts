@@ -93,6 +93,13 @@ export class CaseNode extends vscode.TreeItem {
   }
 }
 
+function actionNode(text: string, icon: string, command: string): vscode.TreeItem {
+  const item = new vscode.TreeItem(text);
+  item.iconPath = new vscode.ThemeIcon(icon);
+  item.command = { command, title: text };
+  return item;
+}
+
 function messageNode(text: string, icon = 'info'): vscode.TreeItem {
   const item = new vscode.TreeItem(text);
   item.iconPath = new vscode.ThemeIcon(icon);
@@ -163,7 +170,10 @@ export class RunsTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem
       runs.unshift(active);
     }
     if (!runs.length) {
-      return [messageNode(s.runsShow === 'all' ? 'No test runs found.' : 'No unfinished test runs. Create one from a test plan.')];
+      return [
+        messageNode(s.runsShow === 'all' ? 'No test runs found.' : 'No unfinished test runs.'),
+        actionNode('Create a test run…', 'add', 'kiwi.createRun'),
+      ];
     }
     return runs.map((r) => new RunNode(r, r.id === active?.id));
   }
