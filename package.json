@@ -2,7 +2,7 @@
   "name": "kiwi-tcms-connector",
   "displayName": "Kiwi TCMS Connector",
   "description": "Manage Kiwi TCMS test plans, runs and cases from VS Code, map them to your automated tests and execute them without leaving the editor.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "local",
   "engines": {
     "vscode": "^1.85.0"
