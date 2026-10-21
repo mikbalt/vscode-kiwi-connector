@@ -22,6 +22,55 @@ export class KiwiRpcError extends Error {
   }
 }
 
+/** The server's TLS certificate is not trusted (self-signed, internal CA, host name mismatch, expired…). */
+export class KiwiCertificateError extends Error {
+  constructor(
+    readonly url: string,
+    readonly code: string | undefined,
+    detail: string,
+  ) {
+    super(`The TLS certificate of ${url} is not trusted (${detail}).`);
+    this.name = 'KiwiCertificateError';
+  }
+}
+
+const CERT_ERROR_CODES = new Set([
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_HAS_EXPIRED',
+  'CERT_NOT_YET_VALID',
+  'CERT_UNTRUSTED',
+  'CERT_SIGNATURE_FAILURE',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'HOSTNAME_MISMATCH',
+]);
+
+function certificateProblem(err: NodeJS.ErrnoException): string | undefined {
+  const code = err.code ?? '';
+  if (!CERT_ERROR_CODES.has(code) && !/certificate|self[- ]signed/i.test(err.message)) {
+    return undefined;
+  }
+  switch (code) {
+    case 'DEPTH_ZERO_SELF_SIGNED_CERT':
+    case 'SELF_SIGNED_CERT_IN_CHAIN':
+      return 'self-signed certificate';
+    case 'ERR_TLS_CERT_ALTNAME_INVALID':
+    case 'HOSTNAME_MISMATCH':
+      return 'the certificate does not match the host name / IP address';
+    case 'CERT_HAS_EXPIRED':
+      return 'the certificate has expired';
+    case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
+    case 'UNABLE_TO_GET_ISSUER_CERT':
+    case 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY':
+      return 'issued by an unknown / internal certificate authority';
+    default:
+      return err.message;
+  }
+}
+
 export interface KiwiClientOptions {
   allowSelfSigned?: boolean;
   timeoutMs?: number;
@@ -152,12 +201,18 @@ export class KiwiClient {
     if (this.sessionId) {
       headers.Cookie = `sessionid=${this.sessionId}`;
     }
-    const transport = this.endpoint.protocol === 'https:' ? https : http;
+    const isHttps = this.endpoint.protocol === 'https:';
+    const transport = isHttps ? https : http;
+    const options: https.RequestOptions = { method: 'POST', headers, agent: this.agent, timeout: this.timeoutMs };
+    if (isHttps) {
+      // Also set on the request itself: VS Code's proxy support may replace the agent.
+      options.rejectUnauthorized = !this.allowSelfSigned;
+    }
 
     return new Promise<T>((resolve, reject) => {
       const req = transport.request(
         this.endpoint,
-        { method: 'POST', headers, agent: this.agent, timeout: this.timeoutMs },
+        options,
         (res) => {
           const chunks: Buffer[] = [];
           res.on('data', (c: Buffer) => chunks.push(c));
@@ -186,7 +241,10 @@ export class KiwiClient {
         },
       );
       req.on('timeout', () => req.destroy(new Error(`Request to ${this.endpoint.href} timed out`)));
-      req.on('error', reject);
+      req.on('error', (err: NodeJS.ErrnoException) => {
+        const problem = certificateProblem(err);
+        reject(problem ? new KiwiCertificateError(this.baseUrl, err.code, problem) : err);
+      });
       req.end(body);
     });
   }

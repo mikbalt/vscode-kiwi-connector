@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { getSettings, updateSetting } from './config';
-import { KiwiClient } from './kiwi/client';
+import { KiwiCertificateError, KiwiClient } from './kiwi/client';
 import type { ExecutionStatus } from './kiwi/types';
 import { errorMessage, normalizeBaseUrl } from './util';
 
@@ -21,6 +21,7 @@ export class Session implements vscode.Disposable {
   private user: string | undefined;
   private statuses: ExecutionStatus[] | undefined;
   private userId: number | undefined;
+  private signingIn = false;
   private readonly changeEmitter = new vscode.EventEmitter<void>();
   readonly onDidChange = this.changeEmitter.event;
 
@@ -67,6 +68,10 @@ export class Session implements vscode.Disposable {
   }
 
   async tryAutoConnect(): Promise<boolean> {
+    if (this.signingIn) {
+      // Settings written by the sign-in flow must not race with it.
+      return this.connected;
+    }
     const { url, username } = getSettings();
     const password = url && username ? await this.secrets.get(secretKey(url, username)) : undefined;
     if (!url || !username || !password) {
@@ -74,11 +79,16 @@ export class Session implements vscode.Disposable {
       return false;
     }
     try {
-      await this.connect(url, username, password);
+      await this.connect(url, username, password, getSettings().allowSelfSigned);
       return true;
     } catch (err) {
       this.disconnect();
       this.log.error(`Automatic sign-in to ${url} failed: ${errorMessage(err)}`);
+      if (err instanceof KiwiCertificateError) {
+        // Accepting stores the setting; the configuration change reconnects automatically.
+        await this.offerSkipVerification(err);
+        return false;
+      }
       const pick = await vscode.window.showWarningMessage(
         `Kiwi TCMS: could not sign in to ${url} — ${errorMessage(err)}`,
         'Sign In',
@@ -90,7 +100,32 @@ export class Session implements vscode.Disposable {
     }
   }
 
+  /** Asks whether to skip TLS verification for this server; stores the choice in `kiwi.allowSelfSignedCertificate`. */
+  private async offerSkipVerification(err: KiwiCertificateError): Promise<boolean> {
+    const skip = 'Skip Certificate Verification';
+    const pick = await vscode.window.showWarningMessage(
+      `Kiwi TCMS: ${err.message} Connect anyway without verifying the certificate? Only do this for a server you trust (e.g. an internal Kiwi instance).`,
+      { modal: true },
+      skip,
+    );
+    if (pick !== skip) {
+      return false;
+    }
+    await updateSetting('allowSelfSignedCertificate', true);
+    this.log.warn(`TLS certificate verification disabled for Kiwi TCMS (${err.url}).`);
+    return true;
+  }
+
   async signIn(): Promise<boolean> {
+    this.signingIn = true;
+    try {
+      return await this.runSignIn();
+    } finally {
+      this.signingIn = false;
+    }
+  }
+
+  private async runSignIn(): Promise<boolean> {
     const s = getSettings();
     const url = await vscode.window.showInputBox({
       title: 'Kiwi TCMS: Sign In (1/3)',
@@ -123,12 +158,22 @@ export class Session implements vscode.Disposable {
     }
     const baseUrl = normalizeBaseUrl(url);
     const user = username.trim();
-    try {
-      await vscode.window.withProgress(
+    const attempt = (allowSelfSigned: boolean) =>
+      vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `Signing in to ${baseUrl}…` },
-        () => this.connect(baseUrl, user, password),
+        () => this.connect(baseUrl, user, password, allowSelfSigned),
       );
+    try {
+      try {
+        await attempt(getSettings().allowSelfSigned);
+      } catch (err) {
+        if (!(err instanceof KiwiCertificateError) || !(await this.offerSkipVerification(err))) {
+          throw err;
+        }
+        await attempt(true);
+      }
     } catch (err) {
+      this.log.error(`Sign-in to ${baseUrl} failed: ${errorMessage(err)}`);
       void vscode.window.showErrorMessage(`Kiwi TCMS sign-in failed: ${errorMessage(err)}`);
       return false;
     }
@@ -202,14 +247,16 @@ export class Session implements vscode.Disposable {
     this.changeEmitter.dispose();
   }
 
-  private async connect(url: string, username: string, password: string): Promise<void> {
-    const client = new KiwiClient(url, { allowSelfSigned: getSettings().allowSelfSigned });
+  private async connect(url: string, username: string, password: string, allowSelfSigned: boolean): Promise<void> {
+    const client = new KiwiClient(url, { allowSelfSigned });
     await client.login(username, password);
     this.client = client;
     this.user = username;
     this.statuses = undefined;
     this.userId = undefined;
-    this.log.info(`Signed in to ${client.baseUrl} as ${username}`);
+    this.log.info(
+      `Signed in to ${client.baseUrl} as ${username}${allowSelfSigned && url.startsWith('https') ? ' (TLS certificate verification skipped)' : ''}`,
+    );
     await vscode.commands.executeCommand('setContext', 'kiwi.connected', true);
     this.changeEmitter.fire();
   }

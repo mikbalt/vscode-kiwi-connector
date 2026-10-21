@@ -6,7 +6,7 @@ Kelola test case dan test run [Kiwi TCMS](https://kiwitcms.org) langsung dari VS
 
 | Fitur | Keterangan |
 |---|---|
-| **Sign in** | Login lewat JSON-RPC Kiwi (`/json-rpc/`). Password disimpan di Secret Storage VS Code, tidak di settings. Self-signed certificate didukung. |
+| **Sign in** | Login lewat JSON-RPC Kiwi (`/json-rpc/`). Password disimpan di Secret Storage VS Code, tidak di settings. HTTPS tidak aman (self-signed, CA internal, URL berupa IP) bisa di-skip: kalau sertifikat ditolak, extension menawarkan tombol **Skip Certificate Verification** lalu otomatis mengaktifkan `kiwi.allowSelfSignedCertificate`. |
 | **Tree view: Test Runs** | Daftar test run yang belum selesai beserta execution dan statusnya. Bisa Run / Pass / Fail langsung dari tree. |
 | **Tree view: Test Plans** | Daftar test plan dan test case-nya. Ikon menunjukkan mana yang sudah **mapped** ke kode, mana yang automated tapi belum ada mapping-nya. |
 | **Active test run** | Pilih satu run sebagai "active run" (terlihat di status bar). Semua hasil eksekusi dari editor dilaporkan ke run ini. |

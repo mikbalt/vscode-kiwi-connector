@@ -160,7 +160,7 @@
           "type": "boolean",
           "default": false,
           "order": 3,
-          "description": "Accept self-signed / untrusted TLS certificates (common for self-hosted Kiwi TCMS)."
+          "markdownDescription": "Skip TLS certificate verification for the Kiwi TCMS server: accepts self-signed certificates, internal CAs and certificates that do not match the host name / IP address (common for self-hosted Kiwi TCMS). When a sign-in fails because of the certificate, the extension offers to enable this for you."
         },
         "kiwi.product": {
           "type": "string",
